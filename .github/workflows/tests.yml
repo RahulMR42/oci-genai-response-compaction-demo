@@ -1,0 +1,36 @@
+name: Offline checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check launcher syntax
+        run: bash -n start.sh
+      - name: Run offline tests
+        run: python -m unittest discover -v
+      - name: Load UI without OCI calls
+        run: |
+          python - <<'PY'
+          from streamlit.testing.v1 import AppTest
+          app = AppTest.from_file("app.py").run(timeout=20)
+          assert not app.exception, [error.message for error in app.exception]
+          assert len(app.chat_input) == 1
+          PY
